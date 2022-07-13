@@ -5,26 +5,171 @@
 #   - add sfdiks
 
 
-echo -e "ArchLinux Installer\nWarning: Before to install arch, set a internet connection and set the next partitions"
-echo -e "\t1.- Boot Partition (/boot)\n\t2.- Root Partition (/)\n\t3.- Swap Partition\n"
+function verify_partition(){
+    #first parameter is the status of the previous command
+    #second parameter is the length, if it's less than 4 could be the complete disk (sdX) 
+    if [ $1 -ne 0 ] || [ $2 -lt 4 ] ;then
+            echo "1"
+    else
+            #select correct partition
+            echo "0"
+    fi
+ 
+}
 
-echo "Please, select one way to install arch"
-echo -e "1) Arch dual boot, separate boot partition (boot,swap and root partition)"
-echo -e "2) Arch dual boot, same Windows boot partition"
-echo -e "9) Exit\n"
+function assign_partitions(){
+ 
+    lb_parts=( "boot" "root" "swap" ) #array to iterate and assign variable's name  
+    for partition in "${lb_parts[@]}";do
+        loop_part=1
+        while [ $loop_part -ne 0 ];do
 
-read op
+                read -p "Select $partition partition: " part_$partition #create unique variable name
+                
+                
+                #it's necessary to create the next variable, cause the script can't 
+                #call the variable like $part_$partition, that's wrong
+                    
+                declare -n part_verify="part_$partition"
+
+
+                lsblk -l | awk '{print $1}' | grep -q $part_verify #find partition's name, if it doesn't, $? set to 1, if not, set to 0
+                loop_part=$(verify_partition $? $(echo $part_verify | awk '{print length}'))             
+                
+                if [ $loop_part -eq 1 ];then
+                        echo "[FAILED] $part_verify is not a partition"
+                else    
+                        echo "[OK] $part_verify selected for $partition"
+                        
+                fi      
+
+        done
+
+    done
+ 
+ 
+}
+
+
+function create_password(){ 
+        #       -$1 profile name
+            
+        loop_pass=0
+        
+        while [ $loop_pass -ne 1 ];do 
+         
+                read -p "Enter ${1}'s password: " -s pass_$1  
+                echo -e "\n"
+                read -p "Retype the password: " -s pass_2       
+                echo -e "\n"
+        
+                declare -n pass_verify="pass_$1"        
+        
+                if [ $pass_verify != $pass_2 ];then
+                        echo "Passwords do not match"
+                else
+                        echo "Password set successfully"
+                        loop_pass=1 #breaks loop
+                fi
+        
+        done    
+        
+ 
+}
+
+ 
+
+clear
+
+echo -e "\n\t\t\t\tArchLinux Installer\n\n"
+echo -e "Warning: Before to install arch, set a internet connection and set the next partitions\n"
+echo -e "\t- Boot Partition (/boot)\n\t- Root Partition (/)\n\t- Swap Partition\n"      
+
+read -n 1 -p "Press any key to continue..." 
+
+
+clear
+echo -e "\n\t\t\t\tArchLinux Installer\n\n"
+echo -e "Please, select one way to install arch\n"
+echo -e "\t1) Arch dual boot, separate boot partition (boot,swap and root partition)"
+echo -e "\t2) Arch dual boot, same Windows boot partition"
+echo -e "\t9) Exit\n"
+
+read -n 1 -p ":" op 
+
+clear
+
+pacman -Sy
+pacman -S python-pip --noconfirm
+pip install terminaltables
+
+ping -c 3 8.8.8.8
+
+if [ $? -ne 0 ];then
+    echo "There's no internet connection"
+    exit 1
+else
+    clear
+fi
+
 
 if [ $op -eq 1 ];then
     #add checking
-    echo "Select boot partition"
-    read part_boot
-    echo "Select root partition"
-    read part_root
-    echo "Select swap partition"
-    read part_swap
-    echo "Enter your profile name"
-    read nick_name
+    lsblk -l | grep part #show partitions
+ 
+    assign_partitions
+
+    read -p "Enter your profile name: " nick_name
+    echo -e "\n"    
+
+    create_password $nick_name
+    declare -n pass_user="pass_$nick_name" #is necessary create this variable to identify the user name and not depend on $1 of the function create_password
+    echo -e "\n"    
+
+    create_password "root"
+
+    #confirm installation
+
+    clear
+
+    echo -e "\nPlease, verify the information\n"
+
+    #Table python script
+
+    #NOTE: respect python indentation
+cat > /mnt/python_table.py << EOF
+
+from terminaltables import AsciiTable
+
+table_part = [
+    ['Partition', 'Label', 'Size'],
+    ['/dev/$part_boot', '/boot', '$(lsblk -l | grep $part_boot | awk '{print $4}')'],
+    ['/dev/$part_root', '/root', '$(lsblk -l | grep $part_root | awk '{print $4}')'],
+    ['/dev/$part_swap', 'swap', '$(lsblk -l | grep $part_swap | awk '{print $4}')']
+]
+table = AsciiTable(table_part)
+print(table.table)
+
+EOF
+
+    python3 /mnt/python_table.py
+
+    rm -rf /mnt/python_table.py
+
+    echo -e "\n\n\tUser =======> $nick_name\n"
+
+
+    read -p "Is everything in order? [yes (uppercase) / no]: " confirm
+    echo -e "\n"
+
+    if [ $confirm != "YES" ];then
+            echo "Aborting..."      
+            exit 1
+    else    
+            echo "Launching installer"
+            sleep 3
+    fi      
+
 
     #time config
     timedatectl set-ntp true
@@ -78,13 +223,16 @@ cat > /mnt/installer_2.sh << EOF
     echo -e "127.0.0.1\tlocalhost\n::1\t\tlocalhost\n127.0.1.1\t${nick_name}pc"
 
     #Password root
-    echo "Enter root's password"
-    passwd root
+    echo -e "$pass_root\n$pass_root" | passwd root
+    
+
 
     #Creating user
     useradd -m -G wheel,audio,video,optical,storage $nick_name -s /bin/bash
-    echo "Enter ${nick_name}'s password"
-    passwd $nick_name
+    echo -e "$pass_user\n$pass_user" | passwd $nick_name
+
+
+
 
     pacman -S sudo neovim git vim --noconfirm
 
@@ -124,6 +272,14 @@ EOF
     #Changing arch root
     chmod +x /mnt/installer_2.sh
     arch-chroot /mnt /installer_2.sh
+
+    rm -rf /mnt/installer_2.sh
+
+    #umount partitions
+
+
+
+    #reboot
 
 elif [ $op -eq 2 ];then
     echo "ERROR: this option is not available yet"
