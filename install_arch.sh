@@ -5,6 +5,9 @@
 #   - add sfdiks
 
 
+extra_packs="openssh base-devel dialog lvm2 wpa_supplicant wireless_tools netctl man pavucontrol pulseaudio" #add any package
+
+
 function verify_partition(){
     #first parameter is the status of the previous command
     #second parameter is the length, if it's less than 4 could be the complete disk (sdX) 
@@ -24,7 +27,7 @@ function assign_partitions(){
         loop_part=1
         while [ $loop_part -ne 0 ];do
 
-                read -p "Select $partition partition: " part_$partition #create unique variable name
+                read -p "Select $partition partition: " part_$partition #create unique variable name (part_boot, part_swap, part_root)
                 
                 
                 #it's necessary to create the next variable, cause the script can't 
@@ -52,13 +55,13 @@ function assign_partitions(){
 
 
 function create_password(){ 
-        #       -$1 profile name
+        #-$1 profile name
             
         loop_pass=0
         
         while [ $loop_pass -ne 1 ];do 
          
-                read -p "Enter ${1}'s password: " -s pass_$1  
+                read -p "Enter ${1}'s password: " -s pass_$1 #it creates pass_root and pass_user variable  
                 echo -e "\n"
                 read -p "Retype the password: " -s pass_2       
                 echo -e "\n"
@@ -129,8 +132,10 @@ while [ $op -ne 9 ];do
         #add checking
         lsblk -l | grep part #show partitions
     
+        ###################---PARTITIONS---##########################
         assign_partitions
 
+        ###################---PROFILE---##########################
         read -p "Enter your profile name: " nick_name
         echo -e "\n"    
 
@@ -140,6 +145,7 @@ while [ $op -ne 9 ];do
 
         create_password "root"
 
+        ###################---GUI---##########################
         echo -e "\n"    
         read -p "Do you want to use graphic interface?[yes/no]: " op_gui
 
@@ -151,20 +157,20 @@ while [ $op -ne 9 ];do
                 read -p "Which of these?: " op_gui_selected
 
                 options=(1 2 3 4 9)
+                op_gui_array=("Gnome" "Plasma" "Xfce" "Mate" "None")
                 if [[ " ${options[*]} " =~ " ${op_gui_selected} " ]];then #compare if the number exists in the array
+                        gui_str=${op_gui_array[$(($op_gui_selected-1))]}
                         loop_gui=1 #breaks loop
-                        echo -e "\n"
                 else
                         echo -e "\nPlease, select a valid option\n"
                         
                 fi
-                #add question vm
-                #add check
 
             done
         fi
 
 
+        ###################---OTHER OS---##########################
         #windows question
         loop_win=0
         while [[ "$loop_win" -ne 1 ]];do
@@ -179,29 +185,102 @@ while [ $op -ne 9 ];do
             fi
         done
 
+        ###################---VM OR PC DRIVERS---##########################
+        loop_vm=0
+        while [[ "$loop_vm" -ne 1 ]];do
+            read -p "Will it be installed in a virtual machine/docker?[yes/no]: " op_vm
+            echo -e "\n"
+            options_vm_1=( "YES" "yes" )
+            options_vm_2=( "NO" "no" )
+            if [[ "${options_vm_1[*]}" =~ "${op_vm}" ]];then #if it's a VM
+                
+                #ADD PACKAGES!!!!!!!!!!!!!
+                
+                gpu_str="None"
+                loop_vm=1 #breaks loop
+            elif [[ "${options_vm_2[*]}" =~ "${op_vm}" ]];then #if it's a PC or laptop
+
+                ###################---GPU DRIVERS---##########################
+                loop_gpu=0
+        
+                while [[ "$loop_gpu" -ne 1 ]];do
+                    echo -e "\nSelect a GPU\n"
+                    echo -e "\n\n\t1) Nvidia\n\t2) Radeon\n"
+                    read -p ":" op_gpu
+        
+                    op_gpu_array=("Nvidia" "Radeon") 
+                    if [[ "$op_gpu" -eq 1 ]];then #NVIDIA
+
+                        echo "Currently nvidia is not supported"
+                        read -n 1 -p "Press any key to continue..." 
+                        
+                        gpu_str=${op_gpu_array[$(($op_gpu-1))]} #only to show in python script table
+
+                        loop_gpu=1 #breaks loop
+        
+                    elif [[ "$op_gpu" -eq 2 ]];then #RADEON
+
+                        extra_packs="${extra_packs} xf86-video-amdgpu vulkan-radeon libva-mesa-driver mesa-vdpau"
+
+                        gpu_str=${op_gpu_array[$(($op_gpu-1))]}
+
+                        loop_gpu=1 #breaks loop
+
+                    else
+                        echo -e "\nPlease, select a valid option\n"
+                            
+                    fi
+                    echo -e "\n"
+        
+                done
+
+                loop_vm=1
+
+            else
+                echo -e "\nPlease, enter a valid option\n"
+            fi
+        done
+
+
+        
+        ###################---INTEL OR AMD CPU---##########################
+        loop_cpu=0
+
+        while [[ "$loop_cpu" -ne 1 ]];do
+            echo -e "\nSelect a CPU\n"
+            echo -e "\t1) Intel\n\t2) AMD\n"
+            read -p ":" op_cpu
+
+            op_cpu_array=("Intel" "AMD")
+            if [[ "$op_cpu" -eq 1 ]];then #INTEL
+                extra_packs="${extra_packs} intel-ucode"
+
+                cpu_str=${op_cpu_array[$(($op_cpu-1))]} #only to show in python script table
+
+                loop_cpu=1 #breaks loop
+
+            elif [[ "$op_cpu" -eq 2 ]];then #AMD
+                extra_packs="${extra_packs} amd-ucode"
+
+                cpu_str=${op_cpu_array[$(($op_cpu-1))]} #only to show in python script table
+
+                loop_cpu=1 #breaks loop
+
+            else
+                echo -e "\nPlease, select a valid option\n"
+                    
+            fi
+            echo -e "\n"
+
+        done
 
         #----------Confirm installation---------------
 
         clear
 
 
-        #Table python script
-
-        #NOTE: respect python indentation
-
-        if [[ "$op_gui_selected" -eq 1 ]];then
-            gui_str="GNOME"
-        elif [[ "$op_gui_selected" -eq 2 ]];then
-            gui_str="Plasma"
-        elif [[ "$op_gui_selected" -eq 3 ]];then
-            gui_str="Xfce"
-        elif [[ "$op_gui_selected" -eq 4 ]];then
-            gui_str="Mate"
-        else
-            gui_str="None"
-        fi
-
-
+#Table python script
+#NOTE: respect python indentation
 
 cat > /mnt/python_table.py << EOF
 
@@ -218,7 +297,10 @@ table_data = [
     ['User', '$nick_name'],
     ['Password', 'SET'],
     ['GUI', '$gui_str'],
-    ['Other OS', '$op_win']
+    ['Other OS', '$op_win'],
+    ['VM', '$op_vm'],
+    ['CPU', '$cpu_str'],
+    ['GPU', '$gpu_str']
 ]
 
 
@@ -236,6 +318,7 @@ EOF
         rm -rf /mnt/python_table.py
 
 
+        echo -e "\n"
         read -p "Is everything in order? [yes (uppercase) / no]: " confirm
         echo -e "\n"
 
@@ -372,8 +455,8 @@ cat > /mnt/installer_2.sh << EOF
         sed -i '/^#\ %wheel\ ALL=(ALL:ALL)\ ALL/s/^# //g' /etc/sudoers
 
 
-        #GRUB INSTALL
-        #   -Add check
+        #-----------GRUB INSTALL---------------
+
         pacman -S grub efibootmgr dosfstools os-prober mtools --noconfirm
 
         grub-install --target=x86_64-efi --bootloader-id=GRUB --efi-directory=/boot --recheck
@@ -391,9 +474,9 @@ cat > /mnt/installer_2.sh << EOF
         pacman -S networkmanager --noconfirm
         systemctl enable NetworkManager
         
-        #Others packages
+        #--------------Others packages---------------
         #change the next line if the cpu is Intel (intel-ucode)
-        pacman -S openssh base-devel dialog lvm2 wpa_supplicant wireless_tools netctl amd-ucode man pavucontrol pulseaudio --noconfirm
+        pacman -S $extra_packs --noconfirm
 
 
         #/etc/fstab backup
