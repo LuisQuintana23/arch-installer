@@ -77,66 +77,132 @@ function create_password(){
  
 }
 
+
+
+op=0
  
-
-clear
-
-echo -e "\n\t\t\t\tArchLinux Installer\n\n"
-echo -e "Warning: Before to install arch, set a internet connection and set the next partitions\n"
-echo -e "\t- Boot Partition (/boot)\n\t- Root Partition (/)\n\t- Swap Partition\n"      
-
-read -n 1 -p "Press any key to continue..." 
-
-
-clear
-echo -e "\n\t\t\t\tArchLinux Installer\n\n"
-echo -e "Please, select one way to install arch\n"
-echo -e "\t1) Arch dual boot, separate boot partition (boot,swap and root partition)"
-echo -e "\t2) Arch dual boot, same Windows boot partition"
-echo -e "\t9) Exit\n"
-
-read -n 1 -p ":" op 
-
-clear
-
-pacman -Sy
-pacman -S python-pip --noconfirm
-pip install terminaltables
-
-ping -c 3 8.8.8.8
-
-if [ $? -ne 0 ];then
-    echo "There's no internet connection"
-    exit 1
-else
+while [ $op -ne 9 ];do
     clear
-fi
+
+    echo -e "\n\t\t\t\tArchLinux Installer\n\n"
+    echo -e "Warning: Before to install arch, set a internet connection and set the next partitions\n"
+    echo -e "\t- Boot Partition (/boot)\n\t- Root Partition (/)\n\t- Swap Partition\n\nIf you want /home in another partition, create and select it later\n"      
+
+    read -n 1 -p "Press any key to continue..." 
 
 
-if [ $op -eq 1 ];then
-    #add checking
-    lsblk -l | grep part #show partitions
- 
-    assign_partitions
+    clear
+    echo -e "\n\t\t\t\tArchLinux Installer\n\n"
+    echo -e "Please, select one way to install arch\n"
+    echo -e "\t1) Arch dual boot"
+    echo -e "\t9) Exit\n"
 
-    read -p "Enter your profile name: " nick_name
-    echo -e "\n"    
+    read -n 1 -p ":" op 
 
-    create_password $nick_name
-    declare -n pass_user="pass_$nick_name" #is necessary create this variable to identify the user name and not depend on $1 of the function create_password
-    echo -e "\n"    
+    if [ $op -eq 9 ];then
+        echo -e "\nAborting...\n"
+        exit 0
+    fi
 
-    create_password "root"
-
-    #confirm installation
 
     clear
 
-    echo -e "\nPlease, verify the information\n"
+    echo "Wait a moment..."
 
-    #Table python script
+    echo "Updating repositories..."
+    pacman -Sy > /dev/null
+    pacman -S python-pip --noconfirm > /dev/null
+    pip install terminaltables > /dev/null
 
-    #NOTE: respect python indentation
+    echo "Verifying internet conection..."
+    ping -c 3 8.8.8.8 > /dev/null
+
+    if [ $? -ne 0 ];then
+        echo "There's no internet connection"
+        exit 1
+    else
+        clear
+    fi
+
+
+    if [ $op -eq 1 ];then
+        #add checking
+        lsblk -l | grep part #show partitions
+    
+        assign_partitions
+
+        read -p "Enter your profile name: " nick_name
+        echo -e "\n"    
+
+        create_password $nick_name
+        declare -n pass_user="pass_$nick_name" #is necessary create this variable to identify the user name and not depend on $1 of the function create_password
+        echo -e "\n"    
+
+        create_password "root"
+
+        echo -e "\n"    
+        read -p "Do you want to use graphic interface?[yes/no]: " op_gui
+
+        loop_gui=0
+
+        if [ $op_gui == "yes" ] || [ $op_gui == "YES" ];then
+            while [[ "$loop_gui" -ne 1 ]];do
+                echo -e "\n\n\t1) Gnome\n\t2) Plasma\n\t3) Xfce\n\t4) Mate\n\t9) Cancel\n"
+                read -p "Which of these?: " op_gui_selected
+
+                options=(1 2 3 4 9)
+                if [[ " ${options[*]} " =~ " ${op_gui_selected} " ]];then #compare if the number exists in the array
+                        loop_gui=1 #breaks loop
+                        echo -e "\n"
+                else
+                        echo -e "\nPlease, select a valid option\n"
+                        
+                fi
+                #add question vm
+                #add check
+
+            done
+        fi
+
+
+        #windows question
+        loop_win=0
+        while [[ "$loop_win" -ne 1 ]];do
+            echo -e "\n"
+            read -p "Do you have any Windows or Linux installation?[yes/no]: " op_win
+            echo -e "\n"
+            options_win=( "YES" "yes" "NO" "no" )
+            if [[ "${options_win[*]}" =~ "${op_win}" ]];then #compare if the word exists in the array
+                loop_win=1
+            else
+                echo -e "\nPlease, enter a valid option\n"
+            fi
+        done
+
+
+        #----------Confirm installation---------------
+
+        clear
+
+
+        #Table python script
+
+        #NOTE: respect python indentation
+
+        if [[ "$op_gui_selected" -eq 1 ]];then
+            gui_str="GNOME"
+        elif [[ "$op_gui_selected" -eq 2 ]];then
+            gui_str="Plasma"
+        elif [[ "$op_gui_selected" -eq 3 ]];then
+            gui_str="Xfce"
+        elif [[ "$op_gui_selected" -eq 4 ]];then
+            gui_str="Mate"
+        else
+            gui_str="None"
+        fi
+
+
+
 cat > /mnt/python_table.py << EOF
 
 from terminaltables import AsciiTable
@@ -147,148 +213,221 @@ table_part = [
     ['/dev/$part_root', '/root', '$(lsblk -l | grep $part_root | awk '{print $4}')'],
     ['/dev/$part_swap', 'swap', '$(lsblk -l | grep $part_swap | awk '{print $4}')']
 ]
-table = AsciiTable(table_part)
-print(table.table)
+table_data = [
+    ['Data', 'Value'],
+    ['User', '$nick_name'],
+    ['Password', 'SET'],
+    ['GUI', '$gui_str'],
+    ['Other OS', '$op_win']
+]
+
+
+table_1 = AsciiTable(table_part)
+table_2 = AsciiTable(table_data)
+print(table_1.table)
+print(table_2.table)
 
 EOF
 
-    python3 /mnt/python_table.py
+        echo -e "\n\t\t\t\tArchLinux Installer\n\n"
+        echo -e "\n\nPlease, verify the information\n"
 
-    rm -rf /mnt/python_table.py
-
-    echo -e "\n\n\tUser =======> $nick_name\n"
-
-
-    read -p "Is everything in order? [yes (uppercase) / no]: " confirm
-    echo -e "\n"
-
-    if [ $confirm != "YES" ];then
-            echo "Aborting..."      
-            exit 1
-    else    
-            echo "Launching installer"
-            sleep 3
-    fi      
+        python3 /mnt/python_table.py
+        rm -rf /mnt/python_table.py
 
 
-    #time config
-    timedatectl set-ntp true
+        read -p "Is everything in order? [yes (uppercase) / no]: " confirm
+        echo -e "\n"
 
-    #swap config
-    mkswap /dev/$part_swap
-    swapon /dev/$part_swap
-
-    #format partitions
-    mkfs.ext4 /dev/$part_root
-    mkfs.fat -F 32 /dev/$part_boot
-    echo -e "[+] Partitions formated"
-
-    #mounting partitions
-    mount /dev/$part_root /mnt
-    mkdir /mnt/boot
-    mount /dev/$part_boot /mnt/boot
-
-    echo -e "[+] Partitions mounted"
-
-    #update mirror list
-    pacman -Sy
-
-    #INSTALLING BASE ARCH
-    pacstrap /mnt base linux linux-firmware
-
-    #Creating fstab file
-    genfstab -U /mnt >> /mnt/etc/fstab
+        if [ $confirm != "YES" ];then
+                echo "Aborting..."      
+                exit 1
+        else    
+                echo "Launching installer"
+                sleep 3
+        fi      
 
 
-    #when change root the script needs to run it in another script
+        #time config
+        timedatectl set-ntp true
+
+        #swap config
+        mkswap /dev/$part_swap
+        swapon /dev/$part_swap
+
+        #format partitions
+        mkfs.ext4 /dev/$part_root
+
+        if [[ "$op_win" == "yes" ]] || [[ "$op_win" == "YES" ]];then #if windows is installed, there's no reason to format the partition
+            echo -e "\nOmitting format boot partition\n"
+        else
+            mkfs.fat -F 32 /dev/$part_boot
+        fi
+
+        echo -e "[+] Partition(s) formated"
+
+        #mounting partitions
+        mount /dev/$part_root /mnt
+        mkdir /mnt/boot
+        mount /dev/$part_boot /mnt/boot
+
+        echo -e "[+] Partitions mounted"
+
+        #update mirror list
+        pacman -Sy
+
+        #INSTALLING BASE ARCH
+        pacstrap /mnt base linux linux-firmware
+
+        #Creating fstab file
+        genfstab -U /mnt >> /mnt/etc/fstab
+
+
+        #when change root the script needs to run it in another script
 cat > /mnt/installer_2.sh << EOF
-#!/bin/bash
+        #!/bin/bash
 
-    #Change zone info
-    ln -sf /usr/share/zoneinfo/Mexico/General /etc/localtime
+        function gui_fail_fixer(){
+            if [[ "$1" -ne 0 ]];then
+                echo -e "\nGraphic interface installation has failed\nPlease, run the next command and install gui manually\n"
+                echo -e "pacman-key --populate archlinux\npacman-key --refresh-keys"
+                exit 1
+            fi
+        }
 
-    #Hardware clock config
-    hwclock --systohc
+        function gui_installer(){
+            if [[ "$op_gui_selected" -ne 9 ]];then
+                
+                pacman -S xorg-server --noconfirm    
 
-    #generate locale
-    sed -i '/^#en_US\.UTF-8/s/^#//g' /etc/locale.gen
-    locale-gen
-    #persistent configuration 
-    echo "LANG=en_US.UTF-8" >> /etc/locale.conf
-    echo "KEYMAP=us" >> /etc/vconsole.conf
+                if [[ "$op_gui_selected" -eq 1 ]];then #gnome
+                    echo -e "\nInstalling GNOME\n"
+                    pacman -S gnome gnome-tweaks gnome-shell --noconfirm
 
+                    #for some reasons the installations may fail
+                    gui_fail_fixer $?
+                    
+                    systemctl enable gdm
+                    
+                elif [[ "$op_gui_selected" -eq 2 ]];then #Plasma
+                    echo -e "\nInstalling KDE-Plasma\n"
+                    pacman -S plasma-meta kde-applications --noconfirm
+                    gui_fail_fixer $?
+                    systemctl enable sddm
 
-    #Host configuration
-    echo "${nick_name}pc" >> /etc/hostname
-    echo -e "127.0.0.1\tlocalhost\n::1\t\tlocalhost\n127.0.1.1\t${nick_name}pc"
+                elif [[ "$op_gui_selected" -eq 3 ]];then #Xfce
+                    echo -e "\nInstalling XFCE4\n"
+                    pacman -S xfce4 xfce4-goodies lightdm lightdm-gtk-greeter --noconfirm
+                    gui_fail_fixer $?
+                    systemctl enable lightdm
 
-    #Password root
-    echo -e "$pass_root\n$pass_root" | passwd root
-    
+                elif [[ "$op_gui_selected" -eq 4 ]];then #Mate
+                    echo -e "\nInstalling Mate\n"
+                    pacman -S mate mate-extra lightdm lightdm-gtk-greeter --noconfirm
+                    gui_fail_fixer $?
+                    systemctl enable lightdm
 
+                else
+                    echo -e "\nInvalid option\n"
 
-    #Creating user
-    useradd -m -G wheel,audio,video,optical,storage $nick_name -s /bin/bash
-    echo -e "$pass_user\n$pass_user" | passwd $nick_name
-
-
-
-
-    pacman -S sudo neovim git vim --noconfirm
-
-    #uncomment wheel visudo
-    sed -i '/^#\ %wheel\ ALL=(ALL:ALL)\ ALL/s/^# //g' /etc/sudoers
-
-
-    #GRUB INSTALL
-    #   -Add check
-    pacman -S grub efibootmgr dosfstools os-prober mtools --noconfirm
-
-    grub-install --target=x86_64-efi --bootloader-id=GRUB --efi-directory=/boot --recheck
-
-    #Detect other os
-    #uncomment grub os-prober disable
-    sed -i '/^#GRUB_DISABLE_OS_PROBER=false/s/^#//g' /etc/default/grub
-    os-prober
-    grub-mkconfig --output=/boot/grub/grub.cfg
-
-
-    #Network manager config 
-    pacman -Syy && pacman -S archlinux-keyring --noconfirm
-
-    pacman -S networkmanager --noconfirm
-    systemctl enable NetworkManager
-    
-    #Others packages
-    #change the next line if the cpu is Intel (intel-ucode)
-    pacman -S openssh base-devel dialog lvm2 wpa_supplicant wireless_tools netctl amd-ucode man --noconfirm
+                fi    
+            fi
+        }
 
 
-    #/etc/fstab backup
-    cp /etc/fstab /etc/fstab.bak
+
+        #Change zone info
+        ln -sf /usr/share/zoneinfo/Mexico/General /etc/localtime
+
+        #Hardware clock config
+        hwclock --systohc
+
+        #generate locale
+        sed -i '/^#en_US\.UTF-8/s/^#//g' /etc/locale.gen
+        locale-gen
+        #persistent configuration 
+        echo "LANG=en_US.UTF-8" >> /etc/locale.conf
+        echo "KEYMAP=us" >> /etc/vconsole.conf
+
+
+        #Host configuration
+        echo "${nick_name}pc" >> /etc/hostname
+        echo -e "127.0.0.1\tlocalhost\n::1\t\tlocalhost\n127.0.1.1\t${nick_name}pc"
+
+        #Password root
+        echo -e "$pass_root\n$pass_root" | passwd root
+        
+
+
+        #Creating user
+        useradd -m -G wheel,audio,video,optical,storage $nick_name -s /bin/bash
+        echo -e "$pass_user\n$pass_user" | passwd $nick_name
+
+
+
+
+        pacman -S sudo neovim git vim --noconfirm
+
+        #uncomment wheel visudo
+        sed -i '/^#\ %wheel\ ALL=(ALL:ALL)\ ALL/s/^# //g' /etc/sudoers
+
+
+        #GRUB INSTALL
+        #   -Add check
+        pacman -S grub efibootmgr dosfstools os-prober mtools --noconfirm
+
+        grub-install --target=x86_64-efi --bootloader-id=GRUB --efi-directory=/boot --recheck
+
+        #Detect other os
+        #uncomment grub os-prober disable
+        sed -i '/^#GRUB_DISABLE_OS_PROBER=false/s/^#//g' /etc/default/grub
+        os-prober
+        grub-mkconfig --output=/boot/grub/grub.cfg
+
+
+        #Network manager config 
+        pacman -Syy && pacman -S archlinux-keyring --noconfirm
+
+        pacman -S networkmanager --noconfirm
+        systemctl enable NetworkManager
+        
+        #Others packages
+        #change the next line if the cpu is Intel (intel-ucode)
+        pacman -S openssh base-devel dialog lvm2 wpa_supplicant wireless_tools netctl amd-ucode man pavucontrol pulseaudio --noconfirm
+
+
+        #/etc/fstab backup
+        cp /etc/fstab /etc/fstab.bak
+
+        #----------Graphic interface-----------
+        if [ $op_gui == "yes" ] || [ $op_gui == "YES" ];then
+            gui_installer
+
+        else
+            echo -e "\nOmitting GUI\n"
+        fi
+
 
 EOF
 
-    #Changing arch root
-    chmod +x /mnt/installer_2.sh
-    arch-chroot /mnt /installer_2.sh
+        #Changing arch root
+        chmod +x /mnt/installer_2.sh
+        arch-chroot /mnt /installer_2.sh
 
-    rm -rf /mnt/installer_2.sh
-
-    #umount partitions
+        rm -rf /mnt/installer_2.sh
 
 
+        #umount partitions
+        umount -l /mnt
+        swapoff /dev/$part_swap
 
-    #reboot
+        op=9
 
-elif [ $op -eq 2 ];then
-    echo "ERROR: this option is not available yet"
+        #reboot
 
-elif [ $op -eq 9 ];then
-    echo "Exiting..."
-else
-    echo "Warning: select a valid option"
+    else
+        echo "Warning: select a valid option"
+    fi
 
-fi
-
+done
 
