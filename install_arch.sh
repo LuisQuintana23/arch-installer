@@ -10,12 +10,15 @@ extra_packs="openssh base-devel dialog lvm2 wpa_supplicant wireless_tools netctl
 
 function installer(){
 
+
+
     clear
 
     echo "Wait a moment..."
 
     echo "Updating repositories..."
     pacman -Sy > /dev/null
+    pacman -S archlinux-keyring --noconfirm > /dev/null
     pacman -S python-pip --noconfirm > /dev/null
     pip install terminaltables > /dev/null
 
