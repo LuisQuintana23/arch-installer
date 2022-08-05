@@ -4,7 +4,7 @@
 #   - add sfdiks
 
 
-extra_packs="openssh base-devel dialog lvm2 wpa_supplicant wireless_tools netctl man pavucontrol pulseaudio firefox ranger" #add any package
+extra_packs="openssh base-devel dialog lvm2 wpa_supplicant wireless_tools netctl man pavucontrol pulseaudio firefox ranger gnome-keyring htop" #add any package
 
 
 
