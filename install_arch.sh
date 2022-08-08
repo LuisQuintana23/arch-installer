@@ -1,8 +1,5 @@
 #!/bin/bash
 
-#enhancements:
-#   - add sfdiks
-
 
 extra_packs="openssh base-devel dialog lvm2 wpa_supplicant wireless_tools netctl man pavucontrol pulseaudio firefox ranger gnome-keyring htop" #add any package
 
@@ -33,9 +30,6 @@ function installer(){
     #-----------------------1) Arch dual boot ----------------------------
     if [[ "$1" -eq 1 ]] || [[ "$1" -eq 2 ]];then
 
-        #add checking
-        lsblk -l | grep part #show partitions
-
         ###################---PARTITIONS---##########################
         assign_partitions $1
 
@@ -48,6 +42,29 @@ function installer(){
         echo -e "\n"    
 
         create_password "root"
+
+        ###################---BIOS or UEFI---##########################
+        echo "Bios or UEFI?: "
+
+        loop_bios=0
+
+	while [[ "$loop_bios" -ne 1 ]];do
+	    echo -e "\n\n\t1) UEFI\n\t2) BIOS\n\n"
+	    read -p "Which of these?: " op_bios_selected
+
+	    options=(1 2)
+	    if [[ " ${options[*]} " =~ " ${op_bios_selected} " ]];then #compare if the number exists in the array
+		    if [[ "$op_bios_selected" -eq 2 ]];then
+			verify_disk #creates op_disk variable, it's necessary to install grub on bios 
+		    fi
+
+		    loop_bios=1 #breaks loop
+	    else
+		    echo -e "\nPlease, select a valid option\n"
+	    fi
+
+	done
+
 
         ###################---GUI---##########################
         echo -e "\n"    
@@ -71,6 +88,8 @@ function installer(){
                 fi
 
             done
+	else
+	    gui_str="None"
         fi
 
 
@@ -167,31 +186,12 @@ function installer(){
 
     elif [[ "$1" -eq 3 ]];then
         #-----------------------3) Fast Installation----------------------------
-        lsblk -l | grep "\ disk\ "
-
-        #verify if the disk exists
-        loop_disk=1
-        while [[ "$loop_disk" -ne 0 ]];do
-
-            read -p "Select disk (eg. sda): " op_disk 
-            
-            lsblk -l | awk '{print $1}' | grep -q $op_disk #find disk's name, if it doesn't, $? set to 1, if not, set to 0
-            
-            if [[ "$?" -ne 0 ]];then
-                    echo "[FAILED] $op_disk is not a disk"
-            else    
-                    echo "[OK] $op_disk selected"
-                    read -p "Press any key to continue..."
-                    loop_disk=0
-                    
-            fi      
-
-        done
-
+	verify_disk
         create_partition "$op_disk"
         nick_name="user_1" #username
         pass_user="user_1" #user's password
         pass_root="root" #root's password
+	op_bios_selected=1 # 1 = UEFI | 2 = BIOS
         op_gui="yes" #yes = gui | no = no gui
         gui_str="Xfce" #none = no gui | Options = Gnome, Plasma, Xfce, Mate
         op_win="no" #yes = dual boot | no = no dual boot
@@ -394,9 +394,19 @@ cat > /mnt/installer_2.sh << EOF
 
     #-----------GRUB INSTALL---------------
 
-    pacman -S grub efibootmgr dosfstools os-prober mtools --noconfirm
+    # verify if is bios or uefi
+    if [[ "$op_bios_selected" -eq 1 ]];then #uefi
+	pacman -S grub efibootmgr dosfstools os-prober mtools --noconfirm
 
-    grub-install --target=x86_64-efi --bootloader-id=GRUB --efi-directory=/boot --recheck
+	grub-install --target=x86_64-efi --bootloader-id=GRUB --efi-directory=/boot --recheck
+
+
+    elif [[ "$op_bios_selected" -eq 2 ]];then #bios packages
+	pacman -S grub dosfstools os-prober mtools --noconfirm
+	grub-install --target=i386-pc --recheck /dev/$op_disk
+
+    fi
+
 
     #Detect other os
     #uncomment grub os-prober disable
@@ -504,6 +514,31 @@ function create_partition(){
 
 }
 
+function verify_disk(){
+
+        lsblk -l | grep "\ disk\ "
+
+        #verify if the disk exists
+        loop_disk=1
+        while [[ "$loop_disk" -ne 0 ]];do
+
+            read -p "Select disk (eg. sda): " op_disk 
+            
+            lsblk -l | awk '{print $1}' | grep -q $op_disk #find disk's name, if it doesn't, $? set to 1, if not, set to 0
+            
+            if [[ "$?" -ne 0 ]];then
+                    echo "[FAILED] $op_disk is not a disk"
+            else    
+                    echo "[OK] $op_disk selected"
+                    read -p "Press any key to continue..."
+                    loop_disk=0
+                    
+            fi      
+
+        done
+
+
+}
 
 
 function verify_partition(){
