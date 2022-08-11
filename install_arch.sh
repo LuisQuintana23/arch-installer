@@ -1,9 +1,6 @@
 #!/bin/bash
 
-
 extra_packs="openssh base-devel dialog lvm2 wpa_supplicant wireless_tools netctl man pavucontrol pulseaudio firefox ranger gnome-keyring htop" #add any package
-
-
 
 function installer(){
 
@@ -20,7 +17,7 @@ function installer(){
     echo "Verifying internet conection..."
     ping -c 3 8.8.8.8 > /dev/null
 
-    if [ $? -ne 0 ];then
+    if [[ "$?" -ne 0 ]];then
         echo "There's no internet connection"
         exit 1
     else
@@ -186,22 +183,9 @@ function installer(){
 
     elif [[ "$1" -eq 3 ]];then
         #-----------------------3) Fast Installation----------------------------
-	verify_disk
-        create_partition "$op_disk"
-        nick_name="user_1" #username
-        pass_user="user_1" #user's password
-        pass_root="root" #root's password
-	op_bios_selected=1 # 1 = UEFI | 2 = BIOS
-        op_gui="yes" #yes = gui | no = no gui
-        gui_str="Xfce" #none = no gui | Options = Gnome, Plasma, Xfce, Mate
-        op_win="no" #yes = dual boot | no = no dual boot
-        op_vm="yes" #yes = vm | no = pc or laptop
-        #The next variables are important for add_extra_packs function
-        cpu_str="AMD" # Intel | AMD
-        gpu_str="none" # Nvidia | Radeon
+        verify_disk
 
     else
-
         echo -e "\nPlease, select a valid option\n"
 
     fi
@@ -626,49 +610,52 @@ function create_password(){
 
 
 
+function main(){
+
+    op=0
+    
+    while [ $op -ne 9 ];do
+        ##########################################################################################
+        ###############                   MAIN MENU                             #################    
+        ##########################################################################################
+
+        clear
+
+        echo -e "\n\t\t\t\tArchLinux Installer\n\n"
+        echo -e "Warning: Before to install arch, set a internet connection and create the next partitions\n"
+        echo -e "\t- Boot Partition (/boot)\n\t- Root Partition (/)\n\t- Swap Partition\n\nIf you want /home in another partition, create and select it later\n"      
+
+        read -n 1 -p "Press any key to continue..." 
 
 
-op=0
- 
-while [ $op -ne 9 ];do
-    ##########################################################################################
-    ###############                   MAIN MENU                             #################    
-    ##########################################################################################
+        clear
+        echo -e "\n\t\t\t\tArchLinux Installer\n\n"
+        echo -e "Please, select one way to install arch\n"
+        echo -e "\t1) Arch dual boot\n"
+        echo -e "\t2) Arch dual boot with home partition\n"
+        echo -e "\t3) Fast installation\n"
+        echo -e "\t9) Exit\n"
 
-    clear
+        read -n 1 -p ":" op 
 
-    echo -e "\n\t\t\t\tArchLinux Installer\n\n"
-    echo -e "Warning: Before to install arch, set a internet connection and create the next partitions\n"
-    echo -e "\t- Boot Partition (/boot)\n\t- Root Partition (/)\n\t- Swap Partition\n\nIf you want /home in another partition, create and select it later\n"      
+        if [[ "$op" -eq 1 ]];then
+            installer "1"
 
-    read -n 1 -p "Press any key to continue..." 
+        elif [[ "$op" -eq 2 ]];then
+            installer "2"
 
+        elif [[ "$op" -eq 3 ]];then
+            installer "3"
 
-    clear
-    echo -e "\n\t\t\t\tArchLinux Installer\n\n"
-    echo -e "Please, select one way to install arch\n"
-    echo -e "\t1) Arch dual boot\n"
-    echo -e "\t2) Arch dual boot with home partition\n"
-    echo -e "\t3) Fast installation\n"
-    echo -e "\t9) Exit\n"
+        elif [[ "$op" -eq 9 ]];then
+            echo -e "\nAborting...\n"
+            exit 0
+        else
+            echo "Warning: select a valid option"
+        fi
 
-    read -n 1 -p ":" op 
+    done
 
-    if [[ "$op" -eq 1 ]];then
-        installer "1"
+}
 
-    elif [[ "$op" -eq 2 ]];then
-        installer "2"
-
-    elif [[ "$op" -eq 3 ]];then
-        installer "3"
-
-    elif [[ "$op" -eq 9 ]];then
-        echo -e "\nAborting...\n"
-        exit 0
-    else
-        echo "Warning: select a valid option"
-    fi
-
-done
-
+main "$@"
